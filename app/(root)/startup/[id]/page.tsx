@@ -1,12 +1,16 @@
 import { formatDate } from "@/lib/utils";
 import { client } from "@/sanity/lib/client";
-import { STARTUP_BY_ID_QUERY } from "@/sanity/lib/queries";
+import {
+    PLAYLIST_BY_SLUG_QUERY,
+    STARTUP_BY_ID_QUERY,
+} from "@/sanity/lib/queries";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import React, { Suspense } from "react";
 import markdownit from "markdown-it";
 import { Skeleton } from "@/components/ui/skeleton";
 import View from "@/components/View";
+import StartupCard, { StartupTypeCard } from "@/components/StartupCard";
 
 export const experimental_ppr = true;
 
@@ -15,9 +19,18 @@ const md = markdownit();
 const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
     const id = (await params).id;
 
-    const post = await client.fetch(STARTUP_BY_ID_QUERY, { id });
+    const [post, { select: editorPosts }] = await Promise.all([
+        client.fetch(STARTUP_BY_ID_QUERY, { id }),
+        client.fetch(PLAYLIST_BY_SLUG_QUERY, {
+            slug: "editor-picks-new",
+        }),
+    ]);
+
+    // const editorPosts = playlistData?.select || [];
+
     if (!post) return notFound();
 
+    console.log(JSON.stringify(post, null, 2));
     const parsedContent = md.render(post?.pitch || "");
 
     return (
@@ -43,7 +56,7 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
                             className="flex gap-2 items-center mb-3"
                         >
                             <img
-                                src={post.author.image}
+                                src={post.author?.image}
                                 alt="avatar"
                                 width={64}
                                 height={64}
@@ -52,10 +65,10 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
 
                             <div>
                                 <p className="text-20-medium">
-                                    {post.author.name}
+                                    {post.author?.name}
                                 </p>
                                 <p className="text-16-medium">
-                                    @{post.author.username}
+                                    @{post.author?.username}
                                 </p>
                             </div>
                         </Link>
@@ -76,7 +89,19 @@ const Page = async ({ params }: { params: Promise<{ id: string }> }) => {
 
                 <hr className="divider" />
 
-                {/* EDITOR SELECTED STARTUPS */}
+                {editorPosts?.length > 0 && (
+                    <div className="max-w-4xl mx-auto">
+                        <p className="text-30-semibold">Editor Picks</p>
+
+                        <ul className="mt-7 card_grid-sm">
+                            {editorPosts.map(
+                                (post: StartupTypeCard, i: number) => (
+                                    <StartupCard key={i} post={post} />
+                                )
+                            )}
+                        </ul>
+                    </div>
+                )}
 
                 <Suspense fallback={<Skeleton className="view_skeleton" />}>
                     <View id={id} />
